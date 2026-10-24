@@ -125,7 +125,7 @@ def predict(m):
     return {'risk_score': risk, 'risk_level': level, 'reasons': reasons, 'recommendation': rec}
 
 def token_for(user):
-    return jwt.encode({'sub': user.id, 'role': user.role, 'exp': datetime.datetime.utcnow()+datetime.timedelta(hours=12)}, app.config['SECRET_KEY'], algorithm='HS256')
+    return jwt.encode({'sub': str(user.id), 'role': user.role, 'exp': datetime.datetime.utcnow()+datetime.timedelta(hours=12)}, app.config['SECRET_KEY'], algorithm='HS256')
 
 def auth_required(fn):
     @wraps(fn)
@@ -347,6 +347,8 @@ def get_assignments():
     now=datetime.datetime.utcnow()
     result=[]
     for a in rows:
+        # Students cannot access an assignment at all after its deadline; teachers retain grading access.
+        if g.user.role=='student' and now > a.deadline: continue
         sub=Submission.query.filter_by(assignment_id=a.id,student_id=g.user.id).first() if g.user.role=='student' else None
         if g.user.role=='student' and not Enrollment.query.filter_by(student_id=g.user.id,course_id=a.course_id).first(): continue
         result.append({'id':a.id,'title':a.title,'description':a.description,'course_id':a.course_id,'course_code':a.course.code,'course_name':a.course.name,'teacher':a.teacher.name,'deadline':a.deadline.isoformat()+'Z','max_score':a.max_score,'closed':now>a.deadline,'my_submission':({'id':sub.id,'content':sub.content,'submitted_at':sub.submitted_at.isoformat()+'Z','score':sub.score,'feedback':sub.feedback} if sub else None), 'submissions':([{'id':x.id,'student_id':x.student_id,'student_name':x.student.name,'content':x.content,'submitted_at':x.submitted_at.isoformat()+'Z','score':x.score,'feedback':x.feedback} for x in Submission.query.filter_by(assignment_id=a.id).all()] if g.user.role=='teacher' else [])})

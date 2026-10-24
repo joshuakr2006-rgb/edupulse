@@ -1,3 +1,67 @@
+import React, {useEffect, useMemo, useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Bell, BookOpen, BrainCircuit, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, CircleHelp, ClipboardCheck, Clock3, GraduationCap, LayoutDashboard, LogOut, Menu, Search, Settings, ShieldCheck, Sparkles, TrendingUp, Users, X} from 'lucide-react';
+import './style.css';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const demo = {teacher:{email:'teacher@demo.edu',password:'Teacher@123'},student:{email:'aarav@demo.edu',password:'Student@123'}};
+async function api(path, token, options={}) {
+  // Always prefer the explicitly supplied token, then fall back to the saved session.
+  const authToken = token || localStorage.getItem('edupulse_token') || '';
+  const headers = {
+    Accept: 'application/json',
+    ...(options.body ? {'Content-Type': 'application/json'} : {}),
+    ...(options.headers || {}),
+  };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  const response = await fetch(`${API}${path}`, {...options, headers});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.error || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+function App(){
+ const [token,setToken]=useState(localStorage.getItem('edupulse_token')||''); const [user,setUser]=useState(null); const [role,setRole]=useState('student'); const [page,setPage]=useState('Overview'); const [data,setData]=useState(null); const [students,setStudents]=useState([]); const [timetable,setTimetable]=useState([]); const [loading,setLoading]=useState(false); const [error,setError]=useState(''); const [search,setSearch]=useState(''); const [mobileNav,setMobileNav]=useState(false); const [toast,setToast]=useState(''); const [showAdd,setShowAdd]=useState(false);
+ async function load(t=token, knownUser=null){
+  const authToken = t || localStorage.getItem('edupulse_token') || '';
+  if (!authToken) return;
+  setLoading(true); setError('');
+  try {
+    // Validate the session with the backend. A 401 means the backend rejected this JWT.
+    const me = knownUser || await api('/me', authToken);
+    setUser(me); setRole(me.role);
+    const dashboard = await api('/dashboard', authToken);
+    setData(dashboard);
+    if (me.role === 'teacher') setStudents(await api('/students', authToken));
+    else setStudents([]);
+    setTimetable(await api('/timetable', authToken));
+  } catch (e) {
+    setError(e.status === 401 ? 'Your session token was rejected by the server. Please check JWT_SECRET on Render and redeploy the backend.' : e.message);
+    setToken(''); setUser(null); setData(null); setStudents([]); setTimetable([]);
+    localStorage.removeItem('edupulse_token');
+  } finally { setLoading(false); }
+ }
+ useEffect(()=>{const saved=localStorage.getItem('edupulse_token'); if(saved) load(saved)},[]);
+ async function login(email,password,r){
+  setLoading(true); setError('');
+  try {
+    const d=await api('/auth/login','',{method:'POST',body:JSON.stringify({email,password,role:r})});
+    if (!d.token || !d.user) throw new Error('Login response did not include a token and user.');
+    localStorage.setItem('edupulse_token', d.token);
+    setToken(d.token); setUser(d.user); setRole(d.user.role); setPage('Overview');
+    // Use the returned user immediately; load still tests protected APIs with the new token.
+    await load(d.token, d.user);
+  } catch(e) { setError(e.message); }
+  finally { setLoading(false); }
+ }
+ function logout(){localStorage.removeItem('edupulse_token');sessionStorage.removeItem('edupulse_token');setToken('');setUser(null);setRole('student');setData(null);setStudents([]);setTimetable([]);setSearch('');setPage('Overview');setMobileNav(false);setShowAdd(false);setError('');setToast('')}
+ async function updateAlert(id,status){try{await api('/alerts/'+id,token,{method:'PATCH',body:JSON.stringify({status})});await load();setToast('Alert updated successfully');setTimeout(()=>setToast(''),2500)}catch(e){setError(e.message)}}
+ if(!token||!user)return <Login onLogin={login} loading={loading} error={error}/>;
+ const nav=role==='teacher'?[['Overview',LayoutDashboard],['Students',Users],['Early warnings',AlertTriangle],['Performance analytics',TrendingUp],['Assessments',ClipboardCheck],['Timetable',CalendarDays]]:[['Overview',LayoutDashboard],['My learning',BookOpen],['My attendance',CalendarDays],['Assessments',ClipboardCheck],['Recommendations',BrainCircuit],['Timetable',CalendarDays]];
+ return <div className="app-shell"><aside className={'sidebar '+(mobileNav?'mobile-open':'')}><div className="brand"><div className="brand-mark"><BrainCircuit size={22}/></div><div><b>EduPulse</b><small>SMART EDUCATION ANALYTICS</small></div><button className="mobile-close" onClick={()=>setMobileNav(false)}><X/></button></div><div className="workspace"><span className="workspace-dot"/> Alliance University <ChevronDown size={14}/></div><div className="nav-label">WORKSPACE</div><nav>{nav.map(([label,Icon])=><button key={label} className={'nav-item '+(page===label?'active':'')} onClick={()=>{setPage(label);setMobileNav(false)}}><Icon size={18}/><span>{label}</span>{label==='Early warnings'&&role==='teacher'&&data?.stats?.open_alerts>0&&<em>{data.stats.open_alerts}</em>}</button>)}</nav><div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><CircleHelp size={18}/></div><b>Need a hand?</b><p>Explore the platform and its insights.</p><button onClick={()=>setToast('Demo platform: use the sample accounts on the login screen.')}>Visit help center <ChevronRight size={14}/></button></div><button className={'nav-item '+(page==='Settings'?'active':'')} onClick={()=>{setPage('Settings');setMobileNav(false)}}><Settings size={18}/><span>Settings</span></button><div className="user-mini"><div className="avatar">{initials(user.name)}</div><div className="user-mini-text"><b>{user.name}</b><small>{role==='teacher'?'Faculty / Teacher':'Student · Semester 5'}</small></div><button title="Log out" onClick={logout}><LogOut size={17}/></button></div></div></aside>
+ <main className="main"><header className="topbar"><button className="hamburger" onClick={()=>setMobileNav(true)}><Menu/></button><div className="crumb">Workspace <ChevronRight size={14}/> <b>{page}</b></div><div className="top-actions"><div className="top-date"><CalendarDays size={15}/> Friday, 23 Oct 2026</div><button className="icon-button" onClick={()=>setPage(role==='teacher'?'Early warnings':'Recommendations')} title="Notifications"><Bell size={18}/>{(data?.stats?.open_alerts||0)>0&&role==='teacher'&&<i/>}</button><button className="icon-button" onClick={logout} title="Log out" aria-label="Log out"><LogOut size={18}/></button><div className="top-user"><div className="avatar">{initials(user.name)}</div><div><b>{user.name}</b><small>{role==='teacher'?'Faculty account':'Student account'}</small></div><ChevronDown size={14}/></div></div></header>
  <div className="content"><div className="page-heading"><div><div className="eyebrow">{role==='teacher'?'FACULTY WORKSPACE':'YOUR LEARNING SPACE'} <span className="live-dot"/> LIVE OVERVIEW</div><h1>{greeting()}, {user.name.split(' ')[0]} <span className="wave">✦</span></h1><p>{role==='teacher'?'A clear view of student progress, risk signals, and where your support matters most.':'Your academic progress, learning activity, and next steps — all in one place.'}</p></div><div className="heading-actions"><button className="btn btn-light" onClick={()=>setPage('Timetable')}><CalendarDays size={16}/> View timetable</button>{role==='teacher'&&<button className="btn btn-primary" onClick={()=>setShowAdd(true)}><span>＋</span> Add student data</button>}</div></div>
  {error&&<div className="error-banner"><AlertTriangle size={17}/>{error}<button onClick={()=>setError('')}><X size={15}/></button></div>}
  {loading&&!data?<div className="loading"><div className="spinner"/>Loading your dashboard…</div>:<>
