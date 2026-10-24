@@ -242,8 +242,20 @@ function Assessments({ data, role, token }) {
           <label>Feedback
             <textarea style={fieldStyle} value={scores[s.id]?.feedback ?? s.feedback ?? ""} onChange={e => setScores(p => ({ ...p, [s.id]: { ...p[s.id], score: p[s.id]?.score ?? s.score ?? "", feedback: e.target.value } }))}/>
           </label>
-          <button style={buttonStyle} onClick={() => grade(s.id, a.max_score)}>Save score</button>
-        </div>)}
+<button
+  type="button"
+  style={buttonStyle}
+  onClick={() => {
+    console.log("Save score clicked", {
+      submissionId: s.id,
+      maxScore: a.max_score,
+      score: scores[s.id]?.score ?? s.score
+    });
+    grade(s.id, a.max_score);
+  }}
+>
+  Save score
+</button>        </div>)}
       </article>)}
     </section>
   </>;
