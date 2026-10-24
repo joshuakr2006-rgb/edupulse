@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: smart-education-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-education-db
+          property: connectionString
+      - key: CLIENT_ORIGIN
+        sync: false
+databases:
+  - name: smart-education-db
+    databaseName: education
+    user: education_user
