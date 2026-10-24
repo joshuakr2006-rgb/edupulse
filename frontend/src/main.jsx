@@ -69,8 +69,7 @@ function App(){
  {page==='Students'&&role==='teacher'&&<StudentsPage students={students} search={search} setSearch={setSearch} setPage={setPage}/>}
  {page==='Early warnings'&&<AlertsPage data={data} role={role} updateAlert={updateAlert}/>}
  {page==='Performance analytics'&&<AnalyticsPage data={data} role={role}/>}
- {page==='Assessments'&&<Assessments data={data} role={role}/>}
- {page==='My learning'&&<Learning data={data}/>}
+{page==='Assessments'&&<Assessments data={data} role={role} token={token}/>} {page==='My learning'&&<Learning data={data}/>}
  {page==='My attendance'&&<Attendance data={data}/>}
  {page==='Recommendations'&&<Recommendations data={data}/>}
  {page==='Timetable'&&<Timetable timetable={timetable}/>}
@@ -89,7 +88,166 @@ function StudentTable({students=[]}){return <div className="table-wrap"><table><
 function StudentsPage({students,search,setSearch,setPage}){const filtered=students.filter(s=>(s.name+' '+s.student_code+' '+s.email).toLowerCase().includes(search.toLowerCase()));return <><div className="toolbar"><div className="searchbox"><Search size={17}/><input placeholder="Search by student name or ID…" value={search} onChange={e=>setSearch(e.target.value)}/></div><span className="muted">{filtered.length} students</span></div><section className="panel"><div className="panel-head"><div><h3>Student directory</h3><p>Academic indicators and predicted support needs</p></div></div><StudentTable students={filtered}/><div className="student-cards">{filtered.map(s=><button className="student-card" key={s.id} onClick={()=>setPage('Performance analytics')}><div className="avatar">{initials(s.name)}</div><b>{s.name}</b><small>{s.student_code}</small><RiskPill level={s.risk_level}/><ChevronRight size={16}/></button>)}</div></section></>}
 function AlertsPage({data,role,updateAlert}){const alerts=data?.alerts||[];return <><div className="section-intro"><div><h2>{role==='teacher'?'Early-warning inbox':'Your academic alerts'}</h2><p>{role==='teacher'?'AI-assisted signals that may need timely faculty attention. Review context before deciding on an intervention.':'Academic signals and reminders to help you get support early.'}</p></div><div className="notice-icon"><Bell size={19}/></div></div><div className="alert-summary"><div><b>{alerts.filter(a=>a.status==='New').length}</b><span>New</span></div><div><b>{alerts.filter(a=>a.status==='Reviewed').length}</b><span>Reviewed</span></div><div><b>{alerts.filter(a=>a.status==='Resolved').length}</b><span>Resolved</span></div></div><div className="alert-list">{alerts.map(a=><article className="alert-card" key={a.id}><div className={'alert-mark '+a.severity}><AlertTriangle size={20}/></div><div className="alert-content"><div className="alert-title-line"><h3>{a.title}</h3><RiskPill level={a.severity==='high'?'High':a.severity==='medium'?'Moderate':'Low'}/></div>{role==='teacher'&&<div className="alert-student">{a.student_name} · {a.student_code}</div>}<p>{a.message}</p><div className="alert-meta"><span><Clock3 size={13}/>{new Date(a.created_at).toLocaleString()}</span><span className={'status-pill '+(a.status==='Resolved'?'submitted':'open')}>{a.status}</span></div></div>{role==='teacher'&&<div className="alert-actions">{a.status==='New'&&<button className="btn btn-light btn-small" onClick={()=>updateAlert(a.id,'Reviewed')}>Mark reviewed</button>}{a.status!=='Resolved'&&<button className="btn btn-primary btn-small" onClick={()=>updateAlert(a.id,'Resolved')}><CheckCircle2 size={14}/> Resolve</button>}</div>}</article>)}{!alerts.length&&<div className="empty panel">No alerts right now. New warning signals will appear here as academic data is updated.</div>}</div><div className="disclaimer"><BrainCircuit size={17}/><div><b>How to interpret these signals</b><p>Risk scores are screening aids based on attendance, assessments, assignments, and engagement. They are not definitive judgments. Review the underlying data and speak with the student before taking action.</p></div></div></>}
 function AnalyticsPage({data,role}){const teacher=role==='teacher';const students=data?.students||[];const metrics=data?.metrics||[];const items=teacher?students:metrics;return <><div className="section-intro"><div><h2>Performance analytics</h2><p>{teacher?'Explore cohort-level indicators and compare students who may need support.':'Review your course indicators and the signals behind your progress.'}</p></div><div className="spark-icon large"><BrainCircuit size={22}/></div></div><div className="stat-grid"><Stat title={teacher?'Cohort attendance':'Average attendance'} value={(teacher?data?.stats?.avg_attendance:data?.stats?.attendance)+'%'} note="Attendance indicator" icon={CalendarDays} tone="purple"/><Stat title="Assessment average" value={(teacher?avg(students,'assessment_avg'):data?.stats?.assessment_avg)+'%'} note="Latest available scores" icon={ClipboardCheck} tone="blue"/><Stat title="High risk" value={teacher?data?.stats?.high_risk:metrics.filter(m=>m.risk_level==='High').length} note="Requires review" icon={AlertTriangle} tone="red"/><Stat title="Learning signals" value={metrics.length} note="Course-level records" icon={Activity} tone="green"/></div><section className="panel"><div className="panel-head"><div><h3>{teacher?'Cohort risk distribution':'Course performance breakdown'}</h3><p>Use this as a prompt for review, not as a final decision about a learner.</p></div></div>{teacher?<div className="distribution">{['High','Moderate','Low'].map(l=>{const n=students.filter(s=>s.risk_level===l).length;return <div className="dist-row" key={l}><div className="dist-label"><RiskPill level={l}/><span>{n} students</span></div><div className="dist-track"><i className={'dist-'+l.toLowerCase()} style={{width:(students.length?n/students.length*100:0)+'%'}}/></div><b>{students.length?Math.round(n/students.length*100):0}%</b></div>})}</div>:<StudentTable students={metrics.map((m,i)=>({id:m.id,name:m.course_name,student_code:m.course_code,attendance:m.attendance,assessment_avg:m.assessment_avg,risk_level:m.risk_level}))}/>}</section><section className="panel"><div className="panel-head"><div><h3>{teacher?'Student performance table':'Your learning indicators'}</h3><p>Attendance, assignment, assessment and AI risk signals</p></div></div>{teacher?<StudentTable students={students}/>:<div className="table-wrap"><table><thead><tr><th>Course</th><th>Attendance</th><th>Assignment</th><th>Assessment</th><th>Signal</th></tr></thead><tbody>{metrics.map(m=><tr key={m.id}><td><b>{m.course_name}</b><small className="block">{m.course_code}</small></td><td>{m.attendance}%</td><td>{m.assignment_avg}%</td><td>{m.assessment_avg}%</td><td><RiskPill level={m.risk_level}/></td></tr>)}</tbody></table></div>}</section></>}
-function Assessments({data,role}){return <><div className="section-intro"><div><h2>Assessments & activities</h2><p>Track quizzes, assignments, certification activities, and upcoming work.</p></div><div className="course-icon big"><ClipboardCheck size={22}/></div></div><section className="panel"><div className="panel-head"><div><h3>Activity feed</h3><p>{(data?.activities||[]).length} activities in the current workspace</p></div></div><ActivityList activities={data?.activities||[]}/></section>{role==='teacher'&&<div className="disclaimer"><ClipboardCheck size={17}/><div><b>Faculty tip</b><p>Update student academic records with the “Add student data” button on Overview to refresh risk signals and create early-warning alerts.</p></div></div>}</>}
+
+function Assessments({ data, role, token }) {
+  const [items, setItems] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    course_id: "",
+    deadline: "",
+    max_score: 100
+  });
+  const [answers, setAnswers] = useState({});
+  const [scores, setScores] = useState({});
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const assignments = await api("/assignments", token);
+      setItems(Array.isArray(assignments) ? assignments : assignments.value || []);
+      if (role === "teacher") {
+        const result = await api("/courses", token);
+        setCourses(Array.isArray(result) ? result : result.value || []);
+      }
+    } catch (e) {
+      setError(e.message || "Could not load assignments.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [token, role]);
+
+  async function create(e) {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    try {
+      await api("/assignments", token, {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          course_id: Number(form.course_id),
+          max_score: Number(form.max_score),
+          deadline: new Date(form.deadline).toISOString()
+        })
+      });
+      setForm({ title: "", description: "", course_id: "", deadline: "", max_score: 100 });
+      setMessage("Assignment created successfully.");
+      await load();
+    } catch (e) {
+      setError(e.message || "Could not create assignment.");
+    }
+  }
+
+  async function submit(assignmentId) {
+    setError("");
+    setMessage("");
+    try {
+      await api(`/assignments/${assignmentId}/submit`, token, {
+        method: "POST",
+        body: JSON.stringify({ content: answers[assignmentId] || "" })
+      });
+      setMessage("Submission saved successfully.");
+      await load();
+    } catch (e) {
+      setError(e.message || "Submission failed.");
+    }
+  }
+
+  async function grade(submissionId, maxScore) {
+    const item = scores[submissionId] || {};
+    setError("");
+    setMessage("");
+    try {
+      await api(`/submissions/${submissionId}/score`, token, {
+        method: "PATCH",
+        body: JSON.stringify({
+          score: Number(item.score),
+          feedback: item.feedback || ""
+        })
+      });
+      setMessage("Student score updated.");
+      await load();
+    } catch (e) {
+      setError(e.message || `Enter a score from 0 to ${maxScore}.`);
+    }
+  }
+
+  const fieldStyle = { padding: 10, border: "1px solid #ddd", borderRadius: 8, width: "100%", margin: "5px 0 12px" };
+  const buttonStyle = { padding: "9px 14px", border: 0, borderRadius: 8, cursor: "pointer", background: "#6846c7", color: "white" };
+
+  return <>
+    <div className="section-intro">
+      <div>
+        <h2>Assignments</h2>
+        <p>Create coursework, submit answers before deadlines, and manage individual scores.</p>
+      </div>
+      <div className="course-icon big"><ClipboardCheck size={22}/></div>
+    </div>
+
+    {error && <div className="login-error" role="alert">{error}</div>}
+    {message && <p role="status">{message}</p>}
+    {loading && <p>Loading assignments…</p>}
+
+    {role === "teacher" && <section className="panel" style={{ padding: 20, marginBottom: 20 }}>
+      <h3>Create assignment</h3>
+      <form onSubmit={create}>
+        <label>Title<input style={fieldStyle} required value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}/></label>
+        <label>Description<textarea style={fieldStyle} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}/></label>
+        <label>Course<select style={fieldStyle} required value={form.course_id} onChange={e => setForm(p => ({ ...p, course_id: e.target.value }))}>
+          <option value="">Choose a course</option>
+          {courses.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+        </select></label>
+        <label>Deadline<input style={fieldStyle} type="datetime-local" required min={new Date(Date.now() + 60000).toISOString().slice(0,16)} value={form.deadline} onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))}/></label>
+        <label>Maximum score<input style={fieldStyle} type="number" min="1" required value={form.max_score} onChange={e => setForm(p => ({ ...p, max_score: e.target.value }))}/></label>
+        <button style={buttonStyle} type="submit">Create assignment</button>
+      </form>
+    </section>}
+
+    <section className="panel" style={{ padding: 20 }}>
+      <div className="panel-head"><div><h3>Assignments and submissions</h3><p>{items.length} assignments available to this account</p></div></div>
+      {!loading && items.length === 0 && <p>No assignments are currently available.</p>}
+
+      {items.map(a => <article key={a.id} style={{ borderTop: "1px solid #eee", padding: "18px 0" }}>
+        <h3>{a.title}</h3>
+        <p>{a.course_code} — {a.course_name}</p>
+        <p>{a.description}</p>
+        <p><b>Deadline:</b> {new Date(a.deadline).toLocaleString()}</p>
+        <p><b>Maximum score:</b> {a.max_score}</p>
+
+        {role === "student" && <>
+          {a.my_submission ? <div>
+            <p>Submitted: {new Date(a.my_submission.submitted_at).toLocaleString()}</p>
+            <p><b>Score:</b> {a.my_submission.score ?? "Not graded yet"}</p>
+            {a.my_submission.feedback && <p>Feedback: {a.my_submission.feedback}</p>}
+          </div> : <form onSubmit={e => { e.preventDefault(); submit(a.id); }}>
+            <label>Your answer<textarea style={fieldStyle} required disabled={a.closed} value={answers[a.id] || ""} onChange={e => setAnswers(p => ({ ...p, [a.id]: e.target.value }))}/></label>
+            <button style={buttonStyle} disabled={a.closed || loading}>{a.closed ? "Deadline passed" : "Submit assignment"}</button>
+          </form>}
+        </>}
+
+        {role === "teacher" && (a.submissions || []).map(s => <div key={s.id} style={{ borderTop: "1px solid #eee", padding: 12 }}>
+          <b>{s.student_name}</b>
+          <p style={{ whiteSpace: "pre-wrap" }}>{s.content}</p>
+          <label>Score
+            <input style={fieldStyle} type="number" min="0" max={a.max_score} value={scores[s.id]?.score ?? s.score ?? ""} onChange={e => setScores(p => ({ ...p, [s.id]: { ...p[s.id], score: e.target.value, feedback: p[s.id]?.feedback ?? s.feedback ?? "" } }))}/>
+          </label>
+          <label>Feedback
+            <textarea style={fieldStyle} value={scores[s.id]?.feedback ?? s.feedback ?? ""} onChange={e => setScores(p => ({ ...p, [s.id]: { ...p[s.id], score: p[s.id]?.score ?? s.score ?? "", feedback: e.target.value } }))}/>
+          </label>
+          <button style={buttonStyle} onClick={() => grade(s.id, a.max_score)}>Save score</button>
+        </div>)}
+      </article>)}
+    </section>
+  </>;
+}
 function Learning({data}){return <><div className="section-intro"><div><h2>My learning</h2><p>Your enrolled courses, current performance, and suggested next steps.</p></div><div className="course-icon big"><BookOpen size={22}/></div></div><div className="course-grid">{(data?.metrics||[]).map(m=><div className="course-card" key={m.id}><div className="course-card-top"><div className="course-icon"><BookOpen size={18}/></div><RiskPill level={m.risk_level}/></div><small>{m.course_code}</small><h3>{m.course_name}</h3><div className="course-stats"><span>Attendance <b>{m.attendance}%</b></span><span>Assessment <b>{m.assessment_avg}%</b></span></div><div className="mini-progress"><i style={{width:m.assessment_avg+'%'}}/></div><p>{m.recommendation}</p></div>)}</div></>}
 function Attendance({data}){const metrics=data?.metrics||[];return <><div className="section-intro"><div><h2>My attendance</h2><p>Monitor course-wise attendance and stay aware of the 75% target.</p></div><div className="course-icon big"><CalendarDays size={22}/></div></div><div className="attendance-banner"><div><span>Average attendance</span><h2>{data?.stats?.attendance}%</h2><p>{data?.stats?.attendance>=75?'You are above the 75% target. Keep attending consistently.':'You are below the 75% target. Prioritize upcoming classes and confirm records with faculty.'}</p></div><div className="attendance-ring" style={{'--percent':(data?.stats?.attendance||0)*3.6+'deg'}}><div><b>{data?.stats?.attendance}%</b><small>ATTENDED</small></div></div></div><section className="panel"><div className="panel-head"><div><h3>Subject-wise attendance report</h3><p>Current recorded attendance by course</p></div></div><div className="attendance-list">{metrics.map(m=><div className="attendance-line" key={m.id}><div className="attendance-course"><b>{m.course_name}</b><small>{m.course_code}</small></div><div className="attendance-meter"><div className="mini-progress"><i className={m.attendance<75?'under':''} style={{width:m.attendance+'%'}}/></div></div><b className={m.attendance<75?'text-red':''}>{m.attendance}%</b><span className={'attendance-target '+(m.attendance>=75?'good':'bad')}>{m.attendance>=75?'On target':'Below target'}</span></div>)}</div></section></>}
 function Recommendations({data}){const metrics=data?.metrics||[];return <><div className="section-intro"><div><h2>Personalized recommendations</h2><p>Actionable study suggestions generated from current academic indicators.</p></div><div className="spark-icon large"><Sparkles size={22}/></div></div><div className="recommendation-intro"><BrainCircuit size={22}/><div><b>AI-assisted learning coach</b><p>Recommendations are based on attendance, assignment scores, assessments, and engagement. They are intended to guide a conversation, not replace faculty judgment.</p></div></div><div className="recommendation-grid">{metrics.map(m=><article className="recommendation-card" key={m.id}><div className="rec-head"><div className="course-icon"><BookOpen size={17}/></div><RiskPill level={m.risk_level}/></div><small>{m.course_code}</small><h3>{m.course_name}</h3><p>{m.recommendation}</p><div className="reason-list"><b>Signals to review</b>{m.reasons.map((r,i)=><span key={i}><CheckCircle2 size={14}/>{r}</span>)}</div></article>)}</div></>}
