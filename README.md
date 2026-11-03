@@ -1,100 +1,267 @@
 # EduPulse — Smart Education Monitoring & Analytics Platform
 
-A deploy-ready academic analytics prototype inspired by the supplied Alliance.ai and AUERP screenshots. It seeds 60 fictional students, six separate teacher accounts, six courses per student, course and attendance views, assessment activity, teacher alerts, and a transparent early-warning scoring baseline. All teacher accounts can browse the full student directory and cohort-wide analytics.
+EduPulse is a role-based academic monitoring and analytics platform for teachers and students. It combines a React frontend, a Flask REST API, SQLAlchemy data access, PostgreSQL persistence in production, assignment file uploads, and an ML-based academic-risk prediction component.
 
-## Demo accounts
+## Live deployment
 
-### Teacher accounts (all use password `Teacher@123`)
+- **Frontend:** https://edupulse-frontend-vi2x.onrender.com
+- **Backend API:** https://edupulse-l9io.onrender.com
+- **Health check:** https://edupulse-l9io.onrender.com/api/health
+- **Source repository:** https://github.com/joshuakr2006-rgb/edupulse
 
-- `teacher@demo.edu` — Dr. Meera Sharma
-- `arjun@demo.edu` — Prof. Arjun Menon
-- `priya@demo.edu` — Dr. Priya Iyer
-- `rahul@demo.edu` — Prof. Rahul Verma
-- `kavya@demo.edu` — Dr. Kavya Nair
-- `aditya@demo.edu` — Prof. Aditya Rao
+The deployed application uses the existing Render web services and PostgreSQL database. Do not create a second database or replace the existing production database when updating this project.
 
-### Student accounts
+## Main capabilities
 
-- `aarav@demo.edu` / `Student@123` (featured demo account)
-- `diya@demo.edu`, `ishaan@demo.edu`, `ananya@demo.edu`, `kabir@demo.edu`, `sara@demo.edu` / `Student@123`
-- Additional fictional accounts: `student07@demo.edu` through `student60@demo.edu`, all with password `Student@123`.
+### Authentication and role-based dashboards
+- Separate teacher and student sign-in.
+- Role-specific dashboards and navigation.
+- Student accounts can be created by a teacher from the student-management area.
+- Teacher account initialization can be configured through backend environment variables.
 
-The database seeding is idempotent: it adds missing demo accounts and records without duplicating existing ones. All records are fictional demo data. Do not use real student personal data in this public demo.
+### Teacher workflows
+- Create and manage student accounts.
+- Manage courses and student course assignments.
+- View student and course academic information.
+- Record and correct attendance.
+- Create assignments with descriptions, maximum scores, and deadlines.
+- Review student submissions, download submitted files, enter scores, and provide feedback.
+- View academic indicators and risk information.
 
-All records are fictional demo data. Do not use real student personal data in this public demo.
+### Student workflows
+- Access a student-specific dashboard.
+- View courses, attendance, assessments, and assignments available to the account.
+- Submit assignment files before the deadline.
+- View grading results and teacher feedback.
 
-## Features
+### Assignment uploads
+- Up to 5 files per submission.
+- Maximum 20 MB per file.
+- Maximum 50 MB combined per submission.
+- Supported formats include PDF, DOC/DOCX, JPG/JPEG/PNG, TXT, RTF, ODT, XLS/XLSX/CSV, PPT/PPTX, and ZIP.
+- The backend enforces upload limits and assignment deadlines; client-side checks alone are not relied upon.
+- Production uploads should be stored on the Render persistent disk mounted at `/var/data`, using `UPLOAD_DIR=/var/data/uploads`.
 
-- Separate teacher and student sign-in and role-specific dashboards
-- 60 fictional student profiles with six course-level metric records each (360 initial course records)
-- Six distinct teacher accounts; each teacher can browse the complete student directory and cohort-wide analytics
-- Student directory and course-level academic metrics
-- Attendance, assignment, assessment, and engagement indicators
-- Early-warning scores with contributing factors and suggested interventions
-- Teacher alert inbox with New / Reviewed / Resolved states
-- Teacher can enter academic data; high-risk records create an alert
-- Timetable, notices, course activity feed, attendance report, and recommendations
-- Flask REST API, React + Vite UI, SQLAlchemy database layer
-- SQLite for local development; PostgreSQL URL supported for deployment
+### ML academic-risk prediction
+- The backend loads a bundled Random Forest model from `backend/student_risk_model.joblib`.
+- The model uses four academic indicators: attendance, assignment average, assessment average, and engagement.
+- The prediction classes are **Low**, **Moderate**, and **High**.
+- `backend/train_model.py` contains the model-training workflow.
+
+**Model limitation:** The bundled model was trained using synthetic/example data. It is a working technical prototype, not a model validated on real Alliance University student outcomes. Predictions should be treated as decision-support signals, reviewed by faculty, and never used as the sole basis for academic penalties or consequential decisions. Real deployment requires institution-approved data, validation, fairness evaluation, privacy controls, and ongoing monitoring.
+
+## Technology stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, JavaScript, CSS |
+| Backend | Python, Flask, Flask-CORS |
+| API | REST endpoints |
+| ORM / database layer | Flask-SQLAlchemy, SQLAlchemy |
+| Production database | PostgreSQL |
+| Local development database | SQLite (through `DATABASE_URL`) |
+| Authentication | JWT |
+| ML | scikit-learn, Random Forest, joblib, NumPy |
+| Production hosting | Render |
+
+## Repository structure
+
+```text
+edupulse/
+├── backend/
+│   ├── app.py
+│   ├── requirements.txt
+│   ├── .env.example
+│   ├── student_risk_model.joblib
+│   └── train_model.py
+├── frontend/
+│   ├── index.html
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── vite.config.js
+│   └── src/
+│       ├── main.jsx
+│       └── style.css
+├── .gitignore
+├── README.md
+└── render.yaml
+```
+
+Runtime files such as `.env`, virtual environments, `node_modules`, local database files, and uploaded files must not be committed.
 
 ## Local development
 
-### Backend
+### Requirements
+
+- Python 3.12 recommended (the production Render runtime is configured for Python 3.12).
+- Node.js and npm.
+- Git.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/joshuakr2006-rgb/edupulse.git
+cd edupulse
+```
+
+### 2. Configure and run the backend
 
 ```bash
 cd backend
 python -m venv .venv
-# Windows: .venv\\Scripts\\activate
-# macOS/Linux: source .venv/bin/activate
+```
+
+Activate the environment:
+
+**Windows PowerShell**
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+**macOS/Linux**
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies and create a local environment file:
+
+```bash
 pip install -r requirements.txt
+```
+
+Copy `.env.example` to `.env` and set local values. For example:
+
+```dotenv
+PORT=5000
+DATABASE_URL=sqlite:///education.db
+JWT_SECRET=replace-with-a-long-random-secret
+CLIENT_ORIGIN=http://localhost:5173
+UPLOAD_DIR=./uploads
+MAX_FILES_PER_SUBMISSION=5
+MAX_FILE_SIZE_MB=20
+MAX_TOTAL_UPLOAD_MB=50
+```
+
+Do not commit `.env` or place real credentials in source control.
+
+Start the API:
+
+```bash
 python app.py
 ```
 
-API runs at `http://localhost:5000`. The database is seeded automatically on first startup.
+The API runs locally at `http://localhost:5000`. Check `http://localhost:5000/api/health` for the health response.
 
-### Frontend
+### 3. Configure and run the frontend
 
-In a second terminal:
+Open a second terminal from the repository root:
 
 ```bash
 cd frontend
-npm install
+npm ci
+```
+
+Create `frontend/.env` if needed:
+
+```dotenv
+VITE_API_URL=http://localhost:5000/api
+```
+
+Start the Vite development server:
+
+```bash
 npm run dev
 ```
 
 Open `http://localhost:5173`.
 
-Optional frontend environment variable: `VITE_API_URL=http://localhost:5000/api`.
+For a production build:
 
-## Deploy on Render
+```bash
+npm run build
+```
 
-1. Push this project folder to a new GitHub repository.
-2. In Render, create a **Blueprint** and select the repository. The `backend/render.yaml` blueprint creates a Flask web service and managed PostgreSQL database.
-3. Set `CLIENT_ORIGIN` on the API service to the exact deployed frontend origin (for example `https://your-site.onrender.com`). For multiple origins, separate them with commas.
-4. Create a **Static Site** in Render for `frontend`:
-   - Build command: `npm install && npm run build`
-   - Publish directory: `dist`
-   - Environment variable: `VITE_API_URL=https://YOUR-API-SERVICE.onrender.com/api`
-5. Trigger a redeploy of the frontend after setting `VITE_API_URL`. Trigger/restart the API after setting `CLIENT_ORIGIN`.
-6. Visit the frontend URL and log in with one of the demo accounts above.
+The generated frontend assets are written to `frontend/dist/`.
 
-Render's free web service may sleep when idle; the first request after inactivity can be slow. Check current Render pricing/limits before choosing a database plan. If the managed PostgreSQL instance is not available on your plan, create a PostgreSQL database with a provider you have access to and set `DATABASE_URL` to its connection string.
+## Production deployment on Render
 
-## Prediction method and limitations
+The current production deployment is connected to the existing GitHub repository and existing Render resources. Update those resources rather than creating a new Blueprint or database.
 
-The current baseline is an interpretable weighted score derived from attendance, assignment average, assessment average, and engagement, with High / Moderate / Low bands. It is a **prototype early-warning heuristic**, not a trained TensorFlow model and not a validated dropout predictor. Thresholds are documented in `backend/app.py` (`predict`). Before real-world use, collect approved historical outcomes, validate model performance and fairness, add consent/access controls, audit logs, data retention policies, and a faculty review process. Do not automatically penalize students based on the score.
+### Existing services
 
-## Project alignment
+- Backend web service: `edupulse-l9io`
+- Frontend static site: `edupulse-frontend-vi2x`
+- Existing PostgreSQL database: `edupulse-db`
 
-This prototype covers the requested interactive dashboard, student performance prediction module, personalized recommendation baseline, and technical documentation. The supplied screenshots' academic portal structure is represented with course activities, profile identity, timetable, notifications, and attendance analytics. It is a standalone prototype and is not connected to Alliance University's real AUERP or Alliance.ai systems.
+### Backend service configuration
 
-## Added academic workflows
+- Root directory: `backend`
+- Build command: `pip install -r requirements.txt`
+- Start command: `gunicorn app:app`
+- Health check path: `/api/health`
+- Python runtime: 3.12
 
-- Relational `Course` and `Enrollment` tables with a teacher course-assignment action.
-- Teacher attendance register supports present/absent/late records and correction by student/course/date.
-- Teachers create assignments with course, description, maximum score, and deadline.
-- Students can submit once before the deadline; the API rejects late submissions even if a student bypasses the UI.
-- Teachers can set each student's score and feedback individually, validated against the assignment maximum.
-- New API routes: `GET /api/courses`, `POST /api/courses/assign`, `GET/POST /api/attendance`, `GET/POST /api/assignments`, `POST /api/assignments/<id>/submit`, and `PATCH /api/submissions/<id>/score`.
+Configure the following environment variables in the backend service:
 
-The app remains a prototype with fictional seeded data. Review authentication/authorization, audit logging, migrations, and privacy requirements before using real student records.
+| Variable | Purpose |
+|---|---|
+| `PYTHON_VERSION` | Python runtime; currently `3.12.4` |
+| `DATABASE_URL` | Connection string for the existing PostgreSQL database |
+| `JWT_SECRET` | Long, random secret used for JWT signing |
+| `CLIENT_ORIGIN` | Exact deployed frontend origin |
+| `UPLOAD_DIR` | `/var/data/uploads` for persistent uploads |
+| `MAX_FILES_PER_SUBMISSION` | `5` |
+| `MAX_FILE_SIZE_MB` | `20` |
+| `MAX_TOTAL_UPLOAD_MB` | `50` |
+| `INITIAL_TEACHER_EMAIL` | Email for initial teacher account setup, if needed |
+| `INITIAL_TEACHER_PASSWORD` | Strong initial teacher password, if needed |
+| `INITIAL_TEACHER_NAME` | Display name for initial teacher account, if needed |
+| `PURGE_LEGACY_DEMO_DATA` | Keep disabled unless a deliberate, backed-up cleanup is required |
+
+Never publish secret values in this README, GitHub, screenshots, or chat.
+
+### Persistent file storage
+
+The backend service needs a persistent disk mounted at `/var/data` for uploaded assignment files. Set `UPLOAD_DIR=/var/data/uploads`. Confirm the disk is attached to the existing backend service; a successful deployment by itself does not prove uploaded files survive restarts. Do not store production uploads in an ephemeral application directory.
+
+### Frontend static site configuration
+
+- Root directory: `frontend`
+- Build command: `npm ci && npm run build`
+- Publish directory: `dist`
+- Environment variable:
+
+```dotenv
+VITE_API_URL=https://edupulse-l9io.onrender.com/api
+```
+
+After changing frontend environment variables, trigger a new frontend build/deploy. After changing backend environment variables, redeploy or restart the existing backend service as required by Render.
+
+### Deployment verification checklist
+
+1. Confirm the backend deployment is **Live**.
+2. Open `https://edupulse-l9io.onrender.com/api/health` and confirm the API reports a healthy status and the ML model is loaded.
+3. Open the frontend and sign in with an existing account.
+4. Verify teacher and student access separately.
+5. Verify a database write and read using a test record.
+6. Verify assignment upload, download, grading, and feedback.
+7. Confirm uploaded files remain available after a backend restart or redeployment.
+8. Confirm the frontend is using the deployed API URL.
+
+## Security, privacy, and operational notes
+
+- Do not commit `.env`, database credentials, JWT secrets, passwords, local database files, virtual environments, `node_modules`, or uploaded student documents.
+- Use strong, unique passwords for teacher and student accounts.
+- Do not use real student data in a public demonstration without institutional approval and appropriate privacy safeguards.
+- Restrict access to student records and uploaded submissions to authorized users.
+- Back up the production database before schema or data migrations.
+- Keep `PURGE_LEGACY_DEMO_DATA` disabled unless the intended cleanup has been reviewed and a backup exists.
+- The Render Free plan may have usage, sleep, storage, and database-retention limitations. Check the current service and database status in Render before relying on the deployment for long-term storage.
+
+## Project status and limitations
+
+The frontend and backend have been deployed to Render, the API health endpoint has been checked, the ML artifact has loaded in production, and teacher/student sign-in has been exercised. The live PostgreSQL database was queried successfully and contained one teacher account and one student account at the time of verification.
+
+The full production workflow—especially multi-file upload persistence, deadline enforcement, teacher grading, and end-to-end ML predictions—should still be tested in the deployed environment before describing the system as fully production-ready.
+
+EduPulse is an independent academic prototype. It is not connected to, endorsed by, or an official replacement for Alliance University's AUERP or Alliance.ai systems.
