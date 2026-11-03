@@ -182,9 +182,9 @@ def seed():
     course_columns = {column['name'] for column in inspect(db.engine).get_columns('course')}
     if 'teacher_id' not in course_columns:
         with db.engine.begin() as connection:
-            connection.execute(text('ALTER TABLE course ADD COLUMN teacher_id INTEGER REFERENCES user(id)'))
-    if os.getenv('PURGE_LEGACY_DEMO_DATA', 'false').lower() == 'true':
-        demo_users = User.query.filter(User.email.like('%@demo.edu')).all()
+            migration_sql = """ALTER TABLE course ADD COLUMN teacher_id INTEGER REFERENCES "user"(id)"""
+            connection.execute(text(migration_sql))
+            demo_users = User.query.filter(User.email.like('%@demo.edu')).all()
         demo_ids = [u.id for u in demo_users]
         demo_assignment_ids = [a.id for a in Assignment.query.filter(Assignment.teacher_id.in_(demo_ids)).all()] if demo_ids else []
         sub_query = Submission.query.filter(
