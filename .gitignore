@@ -1,7 +1,10 @@
 node_modules/
 dist/
 .venv/
+venv/
 __pycache__/
 *.py[cod]
-backend/education.db
+*.db
 .env
+backend/instance/
+backend/uploads/
